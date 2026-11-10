@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Gotta!Gaccha!</title>
+<meta name="theme-color" content="#a7f3d0">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  input[type=number]{-moz-appearance:textfield}
+  .inp{width:100%;height:3.25rem;font-size:1.125rem;padding:0 .75rem;border:2px solid #a7f3d0;border-radius:1rem;background:#fffdfe}
+  .inp:focus{outline:3px solid #a7f3d0;border-color:#6ee7b7}
+  .btn{min-height:3rem;padding:0 1rem;border-radius:1rem;font-weight:700}
+</style>
+</head>
+<body class="bg-[#f3fcf9] text-stone-600 pb-10">
+<header class="sticky top-0 z-10 bg-emerald-200 text-emerald-900 shadow-sm">
+  <div class="max-w-xl mx-auto px-3 pt-3 flex items-center justify-between">
+    <h1 class="text-lg font-bold">🍀 Gotta!Gaccha!</h1>
+    <button id="resetAll" class="text-sm bg-white/70 active:bg-white rounded-lg px-3 h-10">入力を一括リセット</button>
+  </div>
+  <nav class="max-w-xl mx-auto flex mt-2">
+    <button data-tab="sim" class="tab flex-1 h-12 font-bold border-b-4 border-transparent text-teal-600">シミュレーション</button>
+    <button data-tab="hist" class="tab flex-1 h-12 font-bold border-b-4 border-transparent text-teal-600">実践履歴・設定</button>
+  </nav>
+</header>
+
+<main class="max-w-xl mx-auto px-3 mt-4">
+<!-- シミュレーション -->
+<section id="tab-sim" class="space-y-4">
+  <div class="bg-white rounded-3xl p-4 shadow-sm border border-emerald-100 space-y-3">
+    <h2 class="font-bold text-emerald-500">くじの基本設定</h2>
+    <label class="block text-sm">1回あたりの金額（円）
+      <input id="price" class="inp" type="number" pattern="\d*" inputmode="numeric" min="0" value="800"></label>
+    <label class="block text-sm">現在の残り総本数
+      <input id="total" class="inp" type="number" pattern="\d*" inputmode="numeric" min="0" placeholder="例: 80"></label>
+    <label class="block text-sm">ラストワン賞の価値（円）
+      <input id="lastOne" class="inp" type="number" pattern="\d*" inputmode="numeric" min="0" value="0"></label>
+  </div>
+
+  <div class="bg-white rounded-3xl p-4 shadow-sm border border-emerald-100 space-y-3">
+    <div class="flex items-center justify-between">
+      <h2 class="font-bold text-emerald-500">当たり枠</h2>
+      <button id="addPrize" class="btn bg-sky-300 text-sky-900 active:bg-sky-400">＋追加</button>
+    </div>
+    <div id="prizes" class="space-y-3"></div>
+  </div>
+
+  <div class="bg-white rounded-3xl p-4 shadow-sm border border-emerald-100 space-y-3">
+    <h2 class="font-bold text-emerald-500">シミュレーション設定</h2>
+    <label class="block text-sm">何回引くか（n回）
+      <input id="n" class="inp" type="number" pattern="\d*" inputmode="numeric" min="0" value="10"></label>
+  </div>
+
+  <div class="bg-white rounded-3xl p-4 shadow-sm border border-emerald-100 space-y-3">
+    <h2 class="font-bold text-emerald-500">計算結果</h2>
+    <div id="warn" class="text-sm text-amber-700 bg-amber-50 rounded-lg p-2 hidden"></div>
+    <div class="grid grid-cols-2 gap-2 text-center">
+      <div class="bg-emerald-50/70 rounded-xl p-3"><div class="text-xs text-slate-500">1回の期待値</div><div id="r-ev" class="text-xl font-bold">-</div></div>
+      <div class="bg-emerald-50/70 rounded-xl p-3"><div class="text-xs text-slate-500">還元率</div><div id="r-rate" class="text-xl font-bold">-</div></div>
+      <div class="bg-emerald-50/70 rounded-xl p-3"><div class="text-xs text-slate-500">n回の合計コスト</div><div id="r-cost" class="text-xl font-bold">-</div></div>
+      <div class="bg-emerald-50/70 rounded-xl p-3"><div class="text-xs text-slate-500">損益の期待値</div><div id="r-pl" class="text-xl font-bold">-</div></div>
+    </div>
+    <div class="bg-sky-50 rounded-xl p-3 text-center">
+      <div class="text-xs text-slate-500">いずれかの当たりを引く確率</div>
+      <div id="r-any" class="text-3xl font-bold text-emerald-500">-</div>
+    </div>
+    <div>
+      <div class="text-sm font-bold mb-1">当たり枠ごとの確率（少なくとも1枚）</div>
+      <ul id="r-each" class="divide-y divide-slate-100"></ul>
+    </div>
+    <div class="bg-emerald-50/70 rounded-xl p-3 space-y-1">
+      <div class="text-sm font-bold">全買い（残り全部）</div>
+      <div class="flex justify-between"><span>総コスト</span><span id="r-allcost" class="font-bold">-</span></div>
+      <div class="flex justify-between"><span>最終損益（ラストワン込）</span><span id="r-allpl" class="font-bold">-</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- 履歴・設定 -->
+<section id="tab-hist" class="space-y-4 hidden">
+  <div class="bg-white rounded-3xl p-4 shadow-sm border border-emerald-100 space-y-3">
+    <h2 class="font-bold text-emerald-500">実践結果を記録</h2>
+    <label class="block text-sm">引いた回数
+      <input id="h-count" class="inp" type="number" pattern="\d*" inputmode="numeric" min="0" placeholder="例: 10"></label>
+    <label class="block text-sm">当たった賞品の合計価値（円）
+      <input id="h-value" class="inp" type="number" pattern="\d*" inputmode="numeric" min="0" placeholder="例: 3000"></label>
+    <label class="block text-sm">メモ（店名・くじ名など・任意）
+      <input id="h-memo" class="inp" type="text" maxlength="100" placeholder="例: ○○店 ワンピース一番くじ"></label>
+    <div class="text-sm text-slate-500">使った金額: <span id="h-preview">-</span></div>
+    <button id="record" class="btn w-full bg-emerald-200 text-emerald-900 active:bg-emerald-300">結果を記録する</button>
+  </div>
+
+  <div class="bg-white rounded-3xl p-4 shadow-sm border border-emerald-100 space-y-2">
+    <h2 class="font-bold text-emerald-500">履歴</h2>
+    <div id="h-summary" class="text-sm bg-emerald-50/70 rounded-lg p-2"></div>
+    <ul id="h-list" class="divide-y divide-slate-100"></ul>
+  </div>
+
+  <div class="bg-white rounded-3xl p-4 shadow-sm border border-emerald-100 space-y-2">
+    <h2 class="font-bold text-emerald-500">バックアップ</h2>
+    <button id="exportJson" class="btn w-full bg-sky-300 text-sky-900 active:bg-sky-400">バックアップを保存（JSON）</button>
+    <button id="exportCsv" class="btn w-full bg-sky-200 text-sky-900 active:bg-sky-300">CSVで出力</button>
+    <label class="block text-sm pt-2">バックアップを復元（JSON）
+      <input id="importFile" type="file" accept=".json,application/json" class="block w-full mt-1 text-sm file:mr-3 file:h-12 file:px-4 file:rounded-xl file:border-0 file:bg-emerald-100 file:font-bold"></label>
+    <div class="flex gap-4 text-sm">
+      <label class="flex items-center gap-2 h-10"><input type="radio" name="imode" value="merge" checked class="w-5 h-5">マージ</label>
+      <label class="flex items-center gap-2 h-10"><input type="radio" name="imode" value="overwrite" class="w-5 h-5">上書き</label>
+    </div>
+    <button id="clearHist" class="btn w-full bg-rose-100 text-rose-600 active:bg-rose-200">履歴をすべて削除</button>
+  </div>
+</section>
+</main>
+<div id="editModal" class="fixed inset-0 z-20 bg-black/30 hidden items-end sm:items-center justify-center p-3">
+  <div class="bg-white rounded-3xl p-4 w-full max-w-xl space-y-3 shadow-lg">
+    <h2 class="font-bold text-teal-600">履歴を編集</h2>
+    <label class="block text-sm">引いた回数<input id="e-count" class="inp" type="number" pattern="\d*" inputmode="numeric" min="0"></label>
+    <label class="block text-sm">使った金額（円）<input id="e-cost" class="inp" type="number" pattern="\d*" inputmode="numeric" min="0"></label>
+    <label class="block text-sm">得た価値（円）<input id="e-value" class="inp" type="number" pattern="\d*" inputmode="numeric" min="0"></label>
+    <label class="block text-sm">メモ<input id="e-memo" class="inp" type="text" maxlength="100"></label>
+    <div class="grid grid-cols-2 gap-2">
+      <button id="e-cancel" class="btn bg-slate-100 text-slate-600">キャンセル</button>
+      <button id="e-save" class="btn bg-emerald-200 text-emerald-900 active:bg-emerald-300">保存</button>
+    </div>
+  </div>
+</div>
+<div id="toast" class="fixed bottom-4 left-1/2 -translate-x-1/2 bg-teal-600 text-white text-sm rounded-full px-4 py-2 hidden"></div>
+<script src="script.js"></script>
+</body>
+</html>
+
