@@ -1,6 +1,6 @@
 ﻿'use strict';
 // バージョンを上げるとキャッシュが更新されます
-const CACHE = 'gotta-gaccha-v1';
+const CACHE = 'gotta-gaccha-v2';
 const CORE = ['./', 'index.html', 'script.js', 'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png'];
 const TAILWIND = 'https://cdn.tailwindcss.com';
 

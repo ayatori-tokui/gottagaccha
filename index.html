@@ -37,16 +37,16 @@
       <input id="price" class="inp" type="number" pattern="\d*" inputmode="numeric" min="0" value="800"></label>
     <label class="block text-sm">現在の残り総本数
       <input id="total" class="inp" type="number" pattern="\d*" inputmode="numeric" min="0" placeholder="例: 80"></label>
+    <label class="block text-sm">外れくじ1本の価値（円・当たり枠に登録しない残り全部）
+      <input id="blank" class="inp" type="number" pattern="\d*" inputmode="numeric" min="0" value="0"></label>
     <label class="block text-sm">ラストワン賞の価値（円）
       <input id="lastOne" class="inp" type="number" pattern="\d*" inputmode="numeric" min="0" value="0"></label>
   </div>
 
   <div class="bg-white rounded-3xl p-4 shadow-sm border border-emerald-100 space-y-3">
-    <div class="flex items-center justify-between">
-      <h2 class="font-bold text-emerald-500">当たり枠</h2>
-      <button id="addPrize" class="btn bg-sky-300 text-sky-900 active:bg-sky-400">＋追加</button>
-    </div>
+    <h2 class="font-bold text-emerald-500">当たり枠</h2>
     <div id="prizes" class="space-y-3"></div>
+    <button id="addPrize" class="btn w-full h-14 text-lg bg-sky-300 text-sky-900 active:bg-sky-400">＋ 当たり枠を追加</button>
   </div>
 
   <div class="bg-white rounded-3xl p-4 shadow-sm border border-emerald-100 space-y-3">

@@ -2,7 +2,7 @@
 
 const STATE_KEY = 'kuji_state_v1';
 const HIST_KEY = 'kuji_history_v1';
-const DEFAULT_STATE = { price: 800, total: '', lastOne: 0, n: 10, prizes: [{ name: '', value: '', count: '' }] };
+const DEFAULT_STATE = { price: 800, total: '', lastOne: 0, blank: 0, n: 10, prizes: [{ name: '', value: '', count: '' }] };
 
 const $ = (id) => document.getElementById(id);
 const yen = (v) => (v < 0 ? '-' : '') + '¥' + Math.round(Math.abs(v)).toLocaleString();
@@ -43,7 +43,10 @@ function calc() {
   const price = num(state.price), N = num(state.total), last = num(state.lastOne), n = num(state.n);
   const prizes = state.prizes.map((p) => ({ name: p.name || '(名称なし)', value: num(p.value), count: num(p.count) }));
   const sumCount = prizes.reduce((a, p) => a + p.count, 0);
-  const sumValue = prizes.reduce((a, p) => a + p.value * p.count, 0);
+  const prizeValue = prizes.reduce((a, p) => a + p.value * p.count, 0);
+  const blank = num(state.blank);
+  const blankCount = Math.max(0, N - sumCount); // 当たり枠に登録されていない残り=外れくじ
+  const sumValue = prizeValue + blank * blankCount;
   const warns = [];
   if (sumCount > N) warns.push('当たり枠の合計本数が残り総本数を超えています。');
   const effN = Math.min(n, N);
@@ -56,7 +59,7 @@ function calc() {
   const each = prizes.map((p) => ({ name: p.name, count: p.count, prob: N > 0 && p.count <= N ? atLeastOne(N, p.count, effN) : 0 }));
   const allCost = price * N;
   const allPl = sumValue + last - allCost;
-  return { ev, rate, cost, plExp: ev * effN - cost, any, each, allCost, allPl, warns, hasN: N > 0 };
+  return { blankCount, ev, rate, cost, plExp: ev * effN - cost, any, each, allCost, allPl, warns, hasN: N > 0 };
 }
 
 function render() {
@@ -92,11 +95,11 @@ function renderPrizes() {
 
 function syncInputs() {
   $('price').value = state.price; $('total').value = state.total;
-  $('lastOne').value = state.lastOne; $('n').value = state.n;
+  $('lastOne').value = state.lastOne; $('blank').value = state.blank ?? 0; $('n').value = state.n;
 }
 
 function bindInputs() {
-  [['price', 'price'], ['total', 'total'], ['lastOne', 'lastOne'], ['n', 'n']].forEach(([id, key]) =>
+  [['price', 'price'], ['total', 'total'], ['lastOne', 'lastOne'], ['blank', 'blank'], ['n', 'n']].forEach(([id, key]) =>
     $(id).addEventListener('input', (e) => { state[key] = e.target.value; saveState(); render(); }));
   $('prizes').addEventListener('input', (e) => {
     const row = e.target.closest('[data-i]'); if (!row || !e.target.dataset.f) return;
@@ -111,7 +114,12 @@ function bindInputs() {
   });
   $('addPrize').addEventListener('click', () => {
     state.prizes.push({ name: '', value: '', count: '' }); saveState(); renderPrizes(); render();
-    const inputs = $('prizes').querySelectorAll('[data-f="name"]'); inputs[inputs.length - 1].focus();
+    const inputs = $('prizes').querySelectorAll('[data-f="name"]');
+    const last = inputs[inputs.length - 1]; last.focus(); last.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  });
+  // 本数欄でEnter(改行/次へ)を押すと次の当たり枠を追加
+  $('prizes').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && e.target.dataset.f === 'count' && e.target.closest('[data-i]').dataset.i == state.prizes.length - 1) { e.preventDefault(); $('addPrize').click(); }
   });
   $('resetAll').addEventListener('click', () => {
     if (!confirm('入力内容をすべてリセットしますか？（履歴は消えません）')) return;
@@ -145,6 +153,7 @@ function renderHistory() {
       <div class="text-sm">
         <div class="text-xs text-slate-400">${esc(fmtDate(h.date))}${h.count ? ` ・${h.count}回` : ''}</div>
         <div>使用 ${yen(h.cost)} / 獲得 ${yen(h.value)}</div>
+        ${h.cond ? `<details class="text-xs text-slate-400"><summary>記録時の条件</summary><div class="break-all">${esc(condText(h.cond))}<br>期待値 ¥${h.cond.ev} / 還元率 ${h.cond.rate}%</div></details>` : ''}
         ${h.memo ? `<div class="text-xs text-slate-500 break-all">📝 ${esc(h.memo)}</div>` : ''}
       </div>
       <div class="flex items-center gap-2">
@@ -155,6 +164,17 @@ function renderHistory() {
     </li>`).join('');
 }
 
+/** 記録時点のシミュレーション条件のスナップショット */
+function snapshotCond() {
+  const r = calc();
+  return {
+    price: num(state.price), total: num(state.total), lastOne: num(state.lastOne), blank: num(state.blank), n: num(state.n),
+    prizes: state.prizes.map((p) => ({ name: p.name || '', value: num(p.value), count: num(p.count) })),
+    ev: Math.round(r.ev * 100) / 100, rate: Math.round(r.rate * 100) / 100,
+  };
+}
+const condText = (c) => c ? `1回¥${c.price} / 残${c.total}本 / 外れ¥${c.blank || 0} / ラスト¥${c.lastOne} / ` + (c.prizes || []).map((p) => `${p.name || '?'}:¥${p.value}×${p.count}`).join(', ') : '';
+
 function updatePreview() {
   $('h-preview').textContent = yen(num($('h-count').value) * num(state.price));
 }
@@ -164,8 +184,9 @@ function bindHistory() {
   $('record').addEventListener('click', () => {
     const count = num($('h-count').value);
     if (!count) { toast('引いた回数を入力してください'); return; }
+    if (!num(state.price)) { toast('シミュレーション画面で1回あたりの金額を入力してください'); return; }
     const value = num($('h-value').value), cost = count * num(state.price);
-    history.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), date: new Date().toISOString(), count, cost, value, profit: value - cost, memo: $('h-memo').value.trim() });
+    history.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), date: new Date().toISOString(), count, cost, value, profit: value - cost, memo: $('h-memo').value.trim(), cond: snapshotCond() });
     saveHist(); renderHistory();
     $('h-count').value = ''; $('h-value').value = ''; $('h-memo').value = ''; updatePreview(); toast('記録しました');
   });
@@ -218,10 +239,19 @@ function exportJson() {
 function exportCsv() {
   if (!history.length) { toast('履歴がありません'); return; }
   const q = (v) => '"' + String(v).replace(/"/g, '""') + '"';
-  const rows = [['日時', '回数', '使った金額', '得た価値', '損益金額', 'メモ'].map(q).join(',')];
+  const rows = [['日時', '回数', '使った金額', '得た価値', '損益金額', 'メモ', '1回の金額', '残り本数', '外れ価値', 'ラストワン価値', '期待値(1回)', '還元率(%)', '当たり枠'].map(q).join(',')];
   history.slice().sort((a, b) => (a.date < b.date ? -1 : 1)).forEach((h) =>
-    rows.push([q(fmtDate(h.date)), h.count || 0, h.cost, h.value, h.profit, q(h.memo || '')].join(',')));
+    rows.push([q(fmtDate(h.date)), h.count || 0, h.cost, h.value, h.profit, q(h.memo || ''), ...(h.cond ? [h.cond.price, h.cond.total, h.cond.blank || 0, h.cond.lastOne, h.cond.ev, h.cond.rate, q((h.cond.prizes || []).map((p) => `${p.name}:${p.value}x${p.count}`).join(' / '))] : ['', '', '', '', '', '', ''])].join(',')));
   download(`kuji_history_${stamp()}.csv`, '\uFEFF' + rows.join('\r\n'), 'text/csv;charset=utf-8');
+}
+
+function cleanCond(c) {
+  if (!c || typeof c !== 'object') return undefined;
+  return {
+    price: num(c.price), total: num(c.total), lastOne: num(c.lastOne), blank: num(c.blank), n: num(c.n),
+    prizes: Array.isArray(c.prizes) ? c.prizes.map((p) => ({ name: String((p && p.name) || ''), value: num(p && p.value), count: num(p && p.count) })) : [],
+    ev: Number(c.ev) || 0, rate: Number(c.rate) || 0,
+  };
 }
 
 function importJson(file) {
@@ -233,7 +263,7 @@ function importJson(file) {
       if (!Array.isArray(list)) throw new Error('format');
       const clean = list.filter((h) => h && h.date).map((h) => {
         const cost = Number(h.cost) || 0, value = Number(h.value) || 0;
-        return { id: String(h.id || Date.now().toString(36) + Math.random().toString(36).slice(2, 6)), date: String(h.date), count: Number(h.count) || 0, cost, value, profit: value - cost, memo: String(h.memo || '').slice(0, 100) };
+        return { id: String(h.id || Date.now().toString(36) + Math.random().toString(36).slice(2, 6)), date: String(h.date), count: Number(h.count) || 0, cost, value, profit: value - cost, memo: String(h.memo || '').slice(0, 100), cond: cleanCond(h.cond) };
       });
       const mode = document.querySelector('input[name="imode"]:checked').value;
       if (mode === 'overwrite') history = clean;
